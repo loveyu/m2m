@@ -91,13 +91,13 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ steps.release.outputs.tag }}"
-          mkdir -p dist/jniLibs
-          cp -R android/app/build/generated/jniLibs/mihomo/. dist/jniLibs/
-          (cd dist && zip -r "../mihomo-android-jniLibs-${tag}.zip" jniLibs)
+          mkdir -p dist
           for abi in arm64-v8a armeabi-v7a x86_64 x86; do
-            cp "dist/jniLibs/${abi}/libmihomo_plugin.so" "libmihomo_plugin-${abi}-${tag}.so"
+            so="android/app/build/generated/jniLibs/mihomo/${abi}/libmihomo_plugin.so"
+            cp "$so" "dist/libmihomo_plugin-${abi}-${tag}.so"
+            xz -k -9 -e "dist/libmihomo_plugin-${abi}-${tag}.so"
           done
-          sha256sum "mihomo-android-jniLibs-${tag}.zip" libmihomo_plugin-*-"${tag}".so > "mihomo-android-plugin-${tag}.sha256"
+          (cd dist && sha256sum libmihomo_plugin-*-"${tag}".so.xz > "mihomo-android-plugin-${tag}.sha256")
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -105,12 +105,11 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag }}
           name: ${{ steps.release.outputs.tag }}
           files: |
-            mihomo-android-jniLibs-${{ steps.release.outputs.tag }}.zip
-            libmihomo_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so
-            libmihomo_plugin-armeabi-v7a-${{ steps.release.outputs.tag }}.so
-            libmihomo_plugin-x86_64-${{ steps.release.outputs.tag }}.so
-            libmihomo_plugin-x86-${{ steps.release.outputs.tag }}.so
-            mihomo-android-plugin-${{ steps.release.outputs.tag }}.sha256
+            dist/libmihomo_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so.xz
+            dist/libmihomo_plugin-armeabi-v7a-${{ steps.release.outputs.tag }}.so.xz
+            dist/libmihomo_plugin-x86_64-${{ steps.release.outputs.tag }}.so.xz
+            dist/libmihomo_plugin-x86-${{ steps.release.outputs.tag }}.so.xz
+            dist/mihomo-android-plugin-${{ steps.release.outputs.tag }}.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

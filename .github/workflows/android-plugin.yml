@@ -95,9 +95,9 @@ jobs:
           for abi in arm64-v8a armeabi-v7a x86_64 x86; do
             so="android/app/build/generated/jniLibs/mihomo/${abi}/libmihomo_plugin.so"
             cp "$so" "dist/libmihomo_plugin-${abi}-${tag}.so"
-            xz -k -9 -e "dist/libmihomo_plugin-${abi}-${tag}.so"
+            gzip -k -9 "dist/libmihomo_plugin-${abi}-${tag}.so"
           done
-          (cd dist && sha256sum libmihomo_plugin-*-"${tag}".so.xz > "mihomo-android-plugin-${tag}.sha256")
+          (cd dist && sha256sum libmihomo_plugin-*-"${tag}".so.gz > "mihomo-android-plugin-${tag}.sha256")
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -105,10 +105,10 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag }}
           name: ${{ steps.release.outputs.tag }}
           files: |
-            dist/libmihomo_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so.xz
-            dist/libmihomo_plugin-armeabi-v7a-${{ steps.release.outputs.tag }}.so.xz
-            dist/libmihomo_plugin-x86_64-${{ steps.release.outputs.tag }}.so.xz
-            dist/libmihomo_plugin-x86-${{ steps.release.outputs.tag }}.so.xz
+            dist/libmihomo_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so.gz
+            dist/libmihomo_plugin-armeabi-v7a-${{ steps.release.outputs.tag }}.so.gz
+            dist/libmihomo_plugin-x86_64-${{ steps.release.outputs.tag }}.so.gz
+            dist/libmihomo_plugin-x86-${{ steps.release.outputs.tag }}.so.gz
             dist/mihomo-android-plugin-${{ steps.release.outputs.tag }}.sha256
           generate_release_notes: true
         env:

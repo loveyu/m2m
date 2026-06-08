@@ -1,0 +1,112 @@
+name: Android Plugin Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-android-plugin:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v5
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Setup NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r29-beta1
+
+    - name: Compute version info
+      id: version
+      run: |
+        VERSION=${{ github.ref_name }}
+        VERSION_NUM=${VERSION#v}
+        MAJOR=$(echo "$VERSION_NUM" | cut -d. -f1)
+        MINOR=$(echo "$VERSION_NUM" | cut -d. -f2)
+        PATCH=$(echo "$VERSION_NUM" | cut -d. -f3)
+        PATCH=${PATCH:-0}
+        VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))
+        echo "version_name=${VERSION_NUM}" >> $GITHUB_OUTPUT
+        echo "version_code=${VERSION_CODE}" >> $GITHUB_OUTPUT
+
+    - name: Build mihomo for android arm64
+      env:
+        GOOS: android
+        GOARCH: arm64
+        CGO_ENABLED: '1'
+        CC: ${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang
+      run: |
+        VERSION=${{ github.ref_name }}
+        BUILDTIME=$(date -u)
+        go build -tags with_gvisor -trimpath \
+          -ldflags "-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' \
+                    -X 'github.com/metacubex/mihomo/constant.BuildTime=${BUILDTIME}' \
+                    -w -s -buildid=" \
+          -o mihomo-android-arm64
+        mkdir -p android/app/src/main/jniLibs/arm64-v8a
+        cp mihomo-android-arm64 android/app/src/main/jniLibs/arm64-v8a/libmihomo.so
+
+    - name: Replace mirror sources with official sources
+      run: |
+        sed -i 's|mirrors.cloud.tencent.com/gradle|services.gradle.org/distributions|g' android/gradle/wrapper/gradle-wrapper.properties
+        sed -i '/maven.aliyun.com/d' android/settings.gradle.kts
+
+    - name: Create keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+        {
+          echo "STORE_FILE=release.keystore"
+          printf 'STORE_PASSWORD=%s\n' "$STORE_PASSWORD"
+          printf 'KEY_ALIAS=%s\n' "$KEY_ALIAS"
+          printf 'KEY_PASSWORD=%s\n' "$KEY_PASSWORD"
+        } > android/keystore.properties
+
+    - name: Build plugin APK
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleRelease \
+          -PversionName="${{ steps.version.outputs.version_name }}" \
+          -PversionCode="${{ steps.version.outputs.version_code }}"
+
+    - name: Rename APK
+      run: |
+        cp android/app/build/outputs/apk/release/app-release.apk \
+          "m2m-plugin-${{ github.ref_name }}.apk"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
+        files: m2m-plugin-${{ github.ref_name }}.apk
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Clean up secrets
+      if: always()
+      run: |
+        rm -f android/app/release.keystore
+        rm -f android/keystore.properties

@@ -41,6 +41,59 @@ static void mihomo_delete_local_ref(JNIEnv* env, jobject obj) {
 static jstring mihomo_new_string(JNIEnv* env, const char* s) {
     return (*env)->NewStringUTF(env, s);
 }
+
+// Socket protector: JVM cache for calling back from Go goroutines
+static JavaVM* mihomo_jvm_cache = NULL;
+
+static void mihomo_cache_java_vm(JNIEnv* env) {
+    if (mihomo_jvm_cache == NULL) {
+        (*env)->GetJavaVM(env, &mihomo_jvm_cache);
+    }
+}
+
+static JNIEnv* mihomo_attach_thread() {
+    if (mihomo_jvm_cache == NULL) return NULL;
+    JNIEnv* env = NULL;
+    jint ret = (*mihomo_jvm_cache)->GetEnv(mihomo_jvm_cache, (void**)&env, JNI_VERSION_1_6);
+    if (ret == JNI_EDETACHED) {
+        (*mihomo_jvm_cache)->AttachCurrentThread(mihomo_jvm_cache, &env, NULL);
+    }
+    return env;
+}
+
+// Socket protector: find class, cache global ref and static method ID
+static jclass mihomo_protector_class = NULL;
+static jmethodID mihomo_protector_method = NULL;
+
+static int mihomo_init_protector(JNIEnv* env) {
+    jclass cls = (*env)->FindClass(env, "info/loveyu/mfca/plugin/MihomoPluginCore");
+    if (cls == NULL) return 0;
+    mihomo_protector_class = (*env)->NewGlobalRef(env, cls);
+    (*env)->DeleteLocalRef(env, cls);
+    if (mihomo_protector_class == NULL) return 0;
+
+    mihomo_protector_method = (*env)->GetStaticMethodID(env, mihomo_protector_class, "notifyMarkSocket", "(I)V");
+    if (mihomo_protector_method == NULL) {
+        (*env)->DeleteGlobalRef(env, mihomo_protector_class);
+        mihomo_protector_class = NULL;
+        return 0;
+    }
+    return 1;
+}
+
+static void mihomo_protect_socket(int fd) {
+    JNIEnv* env = mihomo_attach_thread();
+    if (env == NULL || mihomo_protector_class == NULL || mihomo_protector_method == NULL) return;
+    (*env)->CallStaticVoidMethod(env, mihomo_protector_class, mihomo_protector_method, (jint)fd);
+}
+
+static void mihomo_cleanup_protector(JNIEnv* env) {
+    if (mihomo_protector_class != NULL) {
+        (*env)->DeleteGlobalRef(env, mihomo_protector_class);
+        mihomo_protector_class = NULL;
+    }
+    mihomo_protector_method = NULL;
+}
 */
 import "C"
 
@@ -55,10 +108,12 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/metacubex/mihomo/common/cmd"
+	"github.com/metacubex/mihomo/component/dialer"
 	"github.com/metacubex/mihomo/component/geodata"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
@@ -88,14 +143,41 @@ func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeGetVersion(env *C.JNIEn
 	return C.mihomo_new_string(env, cVersion)
 }
 
+//export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeSetSocketProtector
+func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeSetSocketProtector(
+	env *C.JNIEnv,
+	obj C.jobject,
+	enabled C.jboolean,
+) {
+	if enabled == C.JNI_TRUE {
+		// Cache JavaVM for goroutine thread attachment
+		C.mihomo_cache_java_vm(env)
+		// Cache class and method references
+		if C.mihomo_init_protector(env) == 0 {
+			return
+		}
+		// Set the dialer hook
+		dialer.DefaultSocketHook = socketProtectHook
+	} else {
+		dialer.DefaultSocketHook = nil
+		C.mihomo_cleanup_protector(env)
+	}
+}
+
+func socketProtectHook(network, address string, conn syscall.RawConn) error {
+	return conn.Control(func(fd uintptr) {
+		C.mihomo_protect_socket(C.int(fd))
+	})
+}
+
 //export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStart
 func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStart(
 	env *C.JNIEnv,
 	obj C.jobject,
-	jargs C.jobjectArray,
+	j_args C.jobjectArray,
 	jlogFile C.jstring,
 ) C.jint {
-	args := goStringArray(env, jargs)
+	args := goStringArray(env, j_args)
 	logFile := goString(env, jlogFile)
 
 	androidPluginState.Lock()
@@ -133,6 +215,10 @@ func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStop(env *C.JNIEnv, obj
 	stopLog := androidPluginState.stopLog
 	androidPluginState.stopLog = nil
 	androidPluginState.Unlock()
+
+	// Clear socket hook and cached JNI refs
+	dialer.DefaultSocketHook = nil
+	C.mihomo_cleanup_protector(env)
 
 	executor.Shutdown()
 	if stopLog != nil {

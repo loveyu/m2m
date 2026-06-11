@@ -8,7 +8,7 @@ package main
 #include <stdlib.h>
 #include <string.h>
 
-static char* mihomo_jstring_to_c(JNIEnv* env, jstring s) {
+static char* m2m_jstring_to_c(JNIEnv* env, jstring s) {
     if (s == NULL) {
         return NULL;
     }
@@ -21,78 +21,78 @@ static char* mihomo_jstring_to_c(JNIEnv* env, jstring s) {
     return copy;
 }
 
-static int mihomo_jarray_len(JNIEnv* env, jobjectArray array) {
+static int m2m_jarray_len(JNIEnv* env, jobjectArray array) {
     if (array == NULL) {
         return 0;
     }
     return (*env)->GetArrayLength(env, array);
 }
 
-static jstring mihomo_jarray_get(JNIEnv* env, jobjectArray array, int index) {
+static jstring m2m_jarray_get(JNIEnv* env, jobjectArray array, int index) {
     return (jstring)(*env)->GetObjectArrayElement(env, array, index);
 }
 
-static void mihomo_delete_local_ref(JNIEnv* env, jobject obj) {
+static void m2m_delete_local_ref(JNIEnv* env, jobject obj) {
     if (obj != NULL) {
         (*env)->DeleteLocalRef(env, obj);
     }
 }
 
-static jstring mihomo_new_string(JNIEnv* env, const char* s) {
+static jstring m2m_new_string(JNIEnv* env, const char* s) {
     return (*env)->NewStringUTF(env, s);
 }
 
 // Socket protector: JVM cache for calling back from Go goroutines
-static JavaVM* mihomo_jvm_cache = NULL;
+static JavaVM* m2m_jvm_cache = NULL;
 
-static void mihomo_cache_java_vm(JNIEnv* env) {
-    if (mihomo_jvm_cache == NULL) {
-        (*env)->GetJavaVM(env, &mihomo_jvm_cache);
+static void m2m_cache_java_vm(JNIEnv* env) {
+    if (m2m_jvm_cache == NULL) {
+        (*env)->GetJavaVM(env, &m2m_jvm_cache);
     }
 }
 
-static JNIEnv* mihomo_attach_thread() {
-    if (mihomo_jvm_cache == NULL) return NULL;
+static JNIEnv* m2m_attach_thread() {
+    if (m2m_jvm_cache == NULL) return NULL;
     JNIEnv* env = NULL;
-    jint ret = (*mihomo_jvm_cache)->GetEnv(mihomo_jvm_cache, (void**)&env, JNI_VERSION_1_6);
+    jint ret = (*m2m_jvm_cache)->GetEnv(m2m_jvm_cache, (void**)&env, JNI_VERSION_1_6);
     if (ret == JNI_EDETACHED) {
-        (*mihomo_jvm_cache)->AttachCurrentThread(mihomo_jvm_cache, &env, NULL);
+        (*m2m_jvm_cache)->AttachCurrentThread(m2m_jvm_cache, &env, NULL);
     }
     return env;
 }
 
 // Socket protector: find class, cache global ref and static method ID
-static jclass mihomo_protector_class = NULL;
-static jmethodID mihomo_protector_method = NULL;
+static jclass m2m_protector_class = NULL;
+static jmethodID m2m_protector_method = NULL;
 
-static int mihomo_init_protector(JNIEnv* env) {
-    jclass cls = (*env)->FindClass(env, "info/loveyu/mfca/plugin/MihomoPluginCore");
+static int m2m_init_protector(JNIEnv* env) {
+    jclass cls = (*env)->FindClass(env, "info/loveyu/mfca/plugin/M2mPluginCore");
     if (cls == NULL) return 0;
-    mihomo_protector_class = (*env)->NewGlobalRef(env, cls);
+    m2m_protector_class = (*env)->NewGlobalRef(env, cls);
     (*env)->DeleteLocalRef(env, cls);
-    if (mihomo_protector_class == NULL) return 0;
+    if (m2m_protector_class == NULL) return 0;
 
-    mihomo_protector_method = (*env)->GetStaticMethodID(env, mihomo_protector_class, "notifyMarkSocket", "(I)V");
-    if (mihomo_protector_method == NULL) {
-        (*env)->DeleteGlobalRef(env, mihomo_protector_class);
-        mihomo_protector_class = NULL;
+    m2m_protector_method = (*env)->GetStaticMethodID(env, m2m_protector_class, "notifyMarkSocket", "(I)V");
+    if (m2m_protector_method == NULL) {
+        (*env)->DeleteGlobalRef(env, m2m_protector_class);
+        m2m_protector_class = NULL;
         return 0;
     }
     return 1;
 }
 
-static void mihomo_protect_socket(int fd) {
-    JNIEnv* env = mihomo_attach_thread();
-    if (env == NULL || mihomo_protector_class == NULL || mihomo_protector_method == NULL) return;
-    (*env)->CallStaticVoidMethod(env, mihomo_protector_class, mihomo_protector_method, (jint)fd);
+static void m2m_protect_socket(int fd) {
+    JNIEnv* env = m2m_attach_thread();
+    if (env == NULL || m2m_protector_class == NULL || m2m_protector_method == NULL) return;
+    (*env)->CallStaticVoidMethod(env, m2m_protector_class, m2m_protector_method, (jint)fd);
 }
 
-static void mihomo_cleanup_protector(JNIEnv* env) {
-    if (mihomo_protector_class != NULL) {
-        (*env)->DeleteGlobalRef(env, mihomo_protector_class);
-        mihomo_protector_class = NULL;
+static void m2m_cleanup_protector(JNIEnv* env) {
+    if (m2m_protector_class != NULL) {
+        (*env)->DeleteGlobalRef(env, m2m_protector_class);
+        m2m_protector_class = NULL;
     }
-    mihomo_protector_method = NULL;
+    m2m_protector_method = NULL;
 }
 */
 import "C"
@@ -135,43 +135,43 @@ func init() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
 }
 
-//export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeGetVersion
-func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeGetVersion(env *C.JNIEnv, obj C.jobject) C.jstring {
-	version := fmt.Sprintf("Mihomo Meta %s android/%s %s %s", constant.Version, runtime.GOARCH, runtime.Version(), constant.BuildTime)
+//export Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeGetVersion
+func Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeGetVersion(env *C.JNIEnv, obj C.jobject) C.jstring {
+	version := fmt.Sprintf("m2m %s android/%s %s %s", constant.Version, runtime.GOARCH, runtime.Version(), constant.BuildTime)
 	cVersion := C.CString(version)
 	defer C.free(unsafe.Pointer(cVersion))
-	return C.mihomo_new_string(env, cVersion)
+	return C.m2m_new_string(env, cVersion)
 }
 
-//export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeSetSocketProtector
-func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeSetSocketProtector(
+//export Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeSetSocketProtector
+func Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeSetSocketProtector(
 	env *C.JNIEnv,
 	obj C.jobject,
 	enabled C.jboolean,
 ) {
 	if enabled == C.JNI_TRUE {
 		// Cache JavaVM for goroutine thread attachment
-		C.mihomo_cache_java_vm(env)
+		C.m2m_cache_java_vm(env)
 		// Cache class and method references
-		if C.mihomo_init_protector(env) == 0 {
+		if C.m2m_init_protector(env) == 0 {
 			return
 		}
 		// Set the dialer hook
 		dialer.DefaultSocketHook = socketProtectHook
 	} else {
 		dialer.DefaultSocketHook = nil
-		C.mihomo_cleanup_protector(env)
+		C.m2m_cleanup_protector(env)
 	}
 }
 
 func socketProtectHook(network, address string, conn syscall.RawConn) error {
 	return conn.Control(func(fd uintptr) {
-		C.mihomo_protect_socket(C.int(fd))
+		C.m2m_protect_socket(C.int(fd))
 	})
 }
 
-//export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStart
-func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStart(
+//export Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStart
+func Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStart(
 	env *C.JNIEnv,
 	obj C.jobject,
 	j_args C.jobjectArray,
@@ -204,8 +204,8 @@ func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStart(
 	return 0
 }
 
-//export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStop
-func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStop(env *C.JNIEnv, obj C.jobject) {
+//export Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStop
+func Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStop(env *C.JNIEnv, obj C.jobject) {
 	androidPluginState.Lock()
 	if !androidPluginState.running {
 		androidPluginState.Unlock()
@@ -218,7 +218,7 @@ func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStop(env *C.JNIEnv, obj
 
 	// Clear socket hook and cached JNI refs
 	dialer.DefaultSocketHook = nil
-	C.mihomo_cleanup_protector(env)
+	C.m2m_cleanup_protector(env)
 
 	executor.Shutdown()
 	if stopLog != nil {
@@ -226,8 +226,8 @@ func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStop(env *C.JNIEnv, obj
 	}
 }
 
-//export Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeIsRunning
-func Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeIsRunning(env *C.JNIEnv, obj C.jobject) C.jboolean {
+//export Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeIsRunning
+func Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeIsRunning(env *C.JNIEnv, obj C.jobject) C.jboolean {
 	androidPluginState.Lock()
 	defer androidPluginState.Unlock()
 	if androidPluginState.running {
@@ -354,7 +354,7 @@ func parseAndroidPluginArgs(args []string) ([]hub.Option, []byte, string, string
 		case "-m":
 			geodataMode = true
 		default:
-			return nil, nil, "", "", fmt.Errorf("unsupported mihomo plugin arg: %s", arg)
+			return nil, nil, "", "", fmt.Errorf("unsupported m2m plugin arg: %s", arg)
 		}
 	}
 
@@ -451,7 +451,7 @@ func absolutePath(path string) (string, error) {
 }
 
 func goString(env *C.JNIEnv, value C.jstring) string {
-	cValue := C.mihomo_jstring_to_c(env, value)
+	cValue := C.m2m_jstring_to_c(env, value)
 	if cValue == nil {
 		return ""
 	}
@@ -460,12 +460,12 @@ func goString(env *C.JNIEnv, value C.jstring) string {
 }
 
 func goStringArray(env *C.JNIEnv, array C.jobjectArray) []string {
-	length := int(C.mihomo_jarray_len(env, array))
+	length := int(C.m2m_jarray_len(env, array))
 	result := make([]string, 0, length)
 	for i := 0; i < length; i++ {
-		item := C.mihomo_jarray_get(env, array, C.int(i))
+		item := C.m2m_jarray_get(env, array, C.int(i))
 		result = append(result, goString(env, item))
-		C.mihomo_delete_local_ref(env, C.jobject(item))
+		C.m2m_delete_local_ref(env, C.jobject(item))
 	}
 	return result
 }

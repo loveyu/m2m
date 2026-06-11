@@ -423,6 +423,9 @@ func startAndroidPluginLog(logFile string) (func(), error) {
 	go func() {
 		defer close(done)
 		for event := range sub {
+			if event.LogLevel < log.Level() {
+				continue
+			}
 			_, _ = fmt.Fprintf(file, "%s [%s] %s\n", time.Now().Format(time.RFC3339Nano), event.LogLevel.String(), event.Payload)
 		}
 	}()

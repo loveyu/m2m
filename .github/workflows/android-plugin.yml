@@ -79,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          so="android/app/build/generated/jniLibs/mihomo/arm64-v8a/libmihomo_plugin.so"
+          so="android/app/build/generated/jniLibs/mihomo/arm64-v8a/libm2m_plugin.so"
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D "$so" | tee android-plugin-symbols.txt
           grep -q 'Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeGetVersion' android-plugin-symbols.txt
           grep -q 'Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStart' android-plugin-symbols.txt
@@ -93,11 +93,11 @@ jobs:
           tag="${{ steps.release.outputs.tag }}"
           mkdir -p dist
           for abi in arm64-v8a x86_64; do
-            so="android/app/build/generated/jniLibs/mihomo/${abi}/libmihomo_plugin.so"
-            cp "$so" "dist/libmihomo_plugin-${abi}-${tag}.so"
-            gzip -k -9 "dist/libmihomo_plugin-${abi}-${tag}.so"
+            so="android/app/build/generated/jniLibs/mihomo/${abi}/libm2m_plugin.so"
+            cp "$so" "dist/libm2m_plugin-${abi}-${tag}.so"
+            gzip -k -9 "dist/libm2m_plugin-${abi}-${tag}.so"
           done
-          (cd dist && sha256sum libmihomo_plugin-*-"${tag}".so.gz > "mihomo-android-plugin-${tag}.sha256")
+          (cd dist && sha256sum libm2m_plugin-*-"${tag}".so.gz > "m2m-android-plugin-${tag}.sha256")
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -105,9 +105,9 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag }}
           name: ${{ steps.release.outputs.tag }}
           files: |
-            dist/libmihomo_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so.gz
-            dist/libmihomo_plugin-x86_64-${{ steps.release.outputs.tag }}.so.gz
-            dist/mihomo-android-plugin-${{ steps.release.outputs.tag }}.sha256
+            dist/libm2m_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so.gz
+            dist/libm2m_plugin-x86_64-${{ steps.release.outputs.tag }}.so.gz
+            dist/m2m-android-plugin-${{ steps.release.outputs.tag }}.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

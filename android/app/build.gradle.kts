@@ -135,7 +135,7 @@ val buildMihomoPluginLibraries =
                 appendLine("cd '${mihomoRootDir.absolutePath}'")
                 goAndroidTargets.forEach { target ->
                     val abiOutDir = outputRoot.resolve(target.abi)
-                    val outFile = abiOutDir.resolve("libmihomo_plugin.so")
+                    val outFile = abiOutDir.resolve("libm2m_plugin.so")
                     appendLine("mkdir -p '${abiOutDir.absolutePath}'")
                     append("GOOS=android GOARCH=${target.goArch} CGO_ENABLED=1 ")
                     if (target.goArm != null) {
@@ -147,7 +147,7 @@ val buildMihomoPluginLibraries =
                             "-ldflags '-X \"github.com/metacubex/mihomo/constant.Version=${gitVersion}\" -X \"github.com/metacubex/mihomo/constant.BuildTime=android-plugin\" -w -s -buildid=' " +
                             "-o '${outFile.absolutePath}' .",
                     )
-                    appendLine("rm -f '${abiOutDir.resolve("libmihomo_plugin.h").absolutePath}'")
+                    appendLine("rm -f '${abiOutDir.resolve("libm2m_plugin.h").absolutePath}'")
                 }
             }
         commandLine("bash", "-lc", buildScript)

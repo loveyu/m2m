@@ -17,9 +17,7 @@ val androidApi = 33
 val goAndroidTargets =
     listOf(
         GoAndroidTarget("arm64-v8a", "arm64", clangTriple = "aarch64-linux-android${androidApi}-clang"),
-        GoAndroidTarget("armeabi-v7a", "arm", "7", "armv7a-linux-androideabi${androidApi}-clang"),
         GoAndroidTarget("x86_64", "amd64", clangTriple = "x86_64-linux-android${androidApi}-clang"),
-        GoAndroidTarget("x86", "386", clangTriple = "i686-linux-android${androidApi}-clang"),
     )
 
 val keystorePropsFile = rootProject.file("keystore.properties")

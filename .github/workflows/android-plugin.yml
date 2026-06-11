@@ -81,10 +81,10 @@ jobs:
           set -euo pipefail
           so="android/app/build/generated/jniLibs/mihomo/arm64-v8a/libmihomo_plugin.so"
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D "$so" | tee android-plugin-symbols.txt
-          grep -q 'Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeGetVersion' android-plugin-symbols.txt
-          grep -q 'Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStart' android-plugin-symbols.txt
-          grep -q 'Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeStop' android-plugin-symbols.txt
-          grep -q 'Java_info_loveyu_mfca_plugin_MihomoPluginCore_nativeIsRunning' android-plugin-symbols.txt
+          grep -q 'Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeGetVersion' android-plugin-symbols.txt
+          grep -q 'Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStart' android-plugin-symbols.txt
+          grep -q 'Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeStop' android-plugin-symbols.txt
+          grep -q 'Java_info_loveyu_mfca_plugin_M2mPluginCore_nativeIsRunning' android-plugin-symbols.txt
 
       - name: Package plugin libraries
         shell: bash
@@ -92,7 +92,7 @@ jobs:
           set -euo pipefail
           tag="${{ steps.release.outputs.tag }}"
           mkdir -p dist
-          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+          for abi in arm64-v8a x86_64; do
             so="android/app/build/generated/jniLibs/mihomo/${abi}/libmihomo_plugin.so"
             cp "$so" "dist/libmihomo_plugin-${abi}-${tag}.so"
             gzip -k -9 "dist/libmihomo_plugin-${abi}-${tag}.so"
@@ -106,9 +106,7 @@ jobs:
           name: ${{ steps.release.outputs.tag }}
           files: |
             dist/libmihomo_plugin-arm64-v8a-${{ steps.release.outputs.tag }}.so.gz
-            dist/libmihomo_plugin-armeabi-v7a-${{ steps.release.outputs.tag }}.so.gz
             dist/libmihomo_plugin-x86_64-${{ steps.release.outputs.tag }}.so.gz
-            dist/libmihomo_plugin-x86-${{ steps.release.outputs.tag }}.so.gz
             dist/mihomo-android-plugin-${{ steps.release.outputs.tag }}.sha256
           generate_release_notes: true
         env:
